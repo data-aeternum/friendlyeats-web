@@ -54,7 +54,7 @@ export async function updateRestaurantImageReference(
   // End of updateRestaurantImageReference
 }
 
-// Update a restaurant's rating totals and save a new review inside a transaction (implemented in a later tutorial step)
+// Update a restaurant's rating totals and save a new review inside a transaction
 const updateWithRating = async (
   // The Firestore transaction object
   transaction,
@@ -66,15 +66,86 @@ const updateWithRating = async (
   review
   // Close the parameter list and open the function body
 ) => {
-  // Placeholder: does nothing until the reviews step of the tutorial
-  return;
+  // Read the current restaurant document inside the transaction
+  const restaurant = await transaction.get(docRef);
+  // Get the restaurant's fields as a plain object
+  const data = restaurant.data();
+  // Add one to the review count, or start at 1 if there were no reviews yet
+  const newNumRatings = data?.numRatings ? data.numRatings + 1 : 1;
+  // Add the new star rating to the running total of all ratings
+  const newSumRating = (data?.sumRating || 0) + Number(review.rating);
+  // Compute the new average rating
+  const newAverage = newSumRating / newNumRatings;
+
+  // Queue an update of the restaurant's rating fields
+  transaction.update(docRef, {
+    // The new number of reviews
+    numRatings: newNumRatings,
+    // The new total of all star ratings
+    sumRating: newSumRating,
+    // The new average star rating
+    avgRating: newAverage,
+    // Close the update object and the update call
+  });
+
+  // Queue the creation of the new review document
+  transaction.set(newRatingDocument, {
+    // Copy the review fields (text, rating, userId)
+    ...review,
+    // Stamp the review with the current date and time
+    timestamp: Timestamp.fromDate(new Date()),
+    // Close the review object and the set call
+  });
   // End of updateWithRating
 };
 
-// Add a user's review to a restaurant (implemented in a later tutorial step)
+// Add a user's review to a restaurant
 export async function addReviewToRestaurant(db, restaurantId, review) {
-  // Placeholder: does nothing until the reviews step of the tutorial
-  return;
+  // Make sure a restaurant ID was provided
+  if (!restaurantId) {
+    // Stop with an error if it was not
+    throw new Error("No restaurant ID has been provided.");
+    // End of the ID check
+  }
+
+  // Make sure a review was provided
+  if (!review) {
+    // Stop with an error if it was not
+    throw new Error("A valid review has not been provided.");
+    // End of the review check
+  }
+
+  // Try to save the review, catching any error
+  try {
+    // Build a reference to the restaurant document
+    const docRef = doc(collection(db, "restaurants"), restaurantId);
+    // Build a reference to a new, auto-ID document in the restaurant's "ratings" subcollection
+    const newRatingDocument = doc(
+      // Point at restaurants/{restaurantId}/ratings
+      collection(db, `restaurants/${restaurantId}/ratings`),
+      // Close the doc call
+    );
+
+    // Run the rating update and review save together as one atomic transaction
+    await runTransaction(db, (transaction) =>
+      // Do the work inside updateWithRating
+      updateWithRating(transaction, docRef, newRatingDocument, review),
+      // Close the runTransaction call
+    );
+    // If saving failed, handle the error here
+  } catch (error) {
+    // Log the error for debugging
+    console.error(
+      // A readable message
+      "There was an error adding the rating to the restaurant",
+      // The error object itself
+      error,
+      // Close the console.error call
+    );
+    // Re-throw so the caller knows the save failed
+    throw error;
+    // End of the try/catch block
+  }
   // End of addReviewToRestaurant
 }
 
