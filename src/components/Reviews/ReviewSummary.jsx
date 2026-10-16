@@ -53,8 +53,8 @@ export async function GeminiSummary({ restaurantId }) {
       // Use the Google AI plugin, which reads GEMINI_API_KEY
       plugins: [googleAI()],
       // Use Gemini 2.5 Flash as the default model
-      // (the tutorial's gemini-2.0-flash has been retired, so this uses gemini-2.5-flash)
-      model: googleAI.model("gemini-2.5-flash"), // set default model
+      // (the tutorial's gemini-2.0-flash is retired, so this uses the always-current Flash alias)
+      model: googleAI.model("gemini-flash-latest"), // set default model
       // Close the configuration object
     });
     // Send the prompt to Gemini and keep the text of its answer
